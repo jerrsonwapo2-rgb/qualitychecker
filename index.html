@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Streaming Quality Checker</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+:root{--bg:#05060d;--card:rgba(16,20,38,.62);--text:#e9f1ff;--muted:#8791b3;--line:rgba(120,140,255,.18);--accent:#00e5ff;--accent2:#b45cff;--good:#2dffa0;--warn:#ffc247;--bad:#ff4d73;--track:rgba(120,140,255,.12);--glow:rgba(0,229,255,.35);--fh:Orbitron,"Segoe UI",system-ui,sans-serif;--fb:Rajdhani,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#eef2fb;--card:rgba(255,255,255,.72);--text:#0d1330;--muted:#5a6488;--line:rgba(60,80,200,.2);--accent:#0072ff;--accent2:#8a2be2;--good:#00a862;--warn:#c27a00;--bad:#d81b4a;--track:rgba(60,80,200,.1);--glow:rgba(0,114,255,.3);color-scheme:light}}
+:root[data-theme="dark"]{color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:600 17px/1.45 var(--fb);position:relative;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:radial-gradient(900px 500px at 12% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 60%),radial-gradient(800px 500px at 100% 10%,color-mix(in srgb,var(--accent2) 22%,transparent),transparent 60%),var(--bg)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;opacity:.5;-webkit-mask-image:radial-gradient(ellipse at 50% 20%,#000 20%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 20%,#000 20%,transparent 75%)}
+main{max-width:800px;margin:0 auto;padding:28px 16px 48px}
+h1{font:900 1.55rem/1.2 var(--fh);letter-spacing:.06em;margin:0 0 6px;text-transform:uppercase;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font:700 .85rem var(--fh);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+.sub{color:var(--muted);margin:0 0 22px;font-weight:500}
+.card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin-bottom:16px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 10px 40px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.06)}
+.card::before{content:"";position:absolute;top:-1px;left:22px;right:22px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);opacity:.8}
+.hero{text-align:center}
+.phase{font:700 .75rem var(--fh);color:var(--accent);letter-spacing:.3em;text-transform:uppercase;text-shadow:0 0 12px var(--glow)}
+.bar{height:6px;background:var(--track);border-radius:99px;margin:14px auto 8px;overflow:hidden;max-width:440px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;box-shadow:0 0 14px var(--accent);transition:width .3s}
+.status{color:var(--muted);min-height:1.5em;font-size:1rem}
+button{font:700 .85rem var(--fh);letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border:0;border-radius:12px;padding:14px 30px;color:#031018;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 24px var(--glow);transition:transform .15s,box-shadow .15s}
+button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 0 36px var(--accent)}
+button:disabled{opacity:.5;cursor:default;animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.8}}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line);padding:9px 16px;box-shadow:none;font-size:.7rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.stat{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--track)}
+.stat b{display:block;font:700 1.35rem var(--fh);font-variant-numeric:tabular-nums;text-shadow:0 0 14px var(--glow)}
+.stat span{color:var(--muted);font-size:.85rem;letter-spacing:.05em;text-transform:uppercase}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:16px}
+.seg button{border-radius:0;background:transparent;color:var(--muted);padding:10px 20px;box-shadow:none;font-size:.72rem}
+.seg button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#031018}
+.rec{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.badge{font:900 2.6rem var(--fh);min-width:120px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 14px var(--glow))}
+.rec p{margin:0;color:var(--muted);flex:1;min-width:200px}.rec strong{color:var(--text)}
+.row{display:grid;grid-template-columns:56px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .t{font:700 .85rem var(--fh)}
+.meter{height:6px;background:var(--track);border-radius:99px;overflow:hidden}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:.75}
+.row small{display:block;color:var(--muted);font-size:.8rem;margin-top:4px;font-weight:500}
+.tag{font-size:.78rem;font-weight:700;letter-spacing:.05em;padding:4px 11px;border-radius:99px;white-space:nowrap;border:1px solid currentColor}
+.good{color:var(--good);background:color-mix(in srgb,var(--good) 12%,transparent)}
+.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.note{color:var(--muted);font-size:.88rem;margin:10px 0 0;font-weight:500}
+.hist{display:flex;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--line);font-size:.95rem;font-variant-numeric:tabular-nums}
+.hist:first-of-type{border-top:0}
+.gauges{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 6px}
+.gwrap svg{width:100%;max-width:300px;display:block;margin:0 auto}
+.glabel{font:700 .72rem var(--fh);letter-spacing:.25em;text-transform:uppercase;color:var(--muted)}
+.gwrap svg path:first-child{stroke:var(--track)}
+.needle{transform-origin:100px 100px;transform-box:view-box;transform:rotate(-120deg);transition:transform .25s ease-out;filter:drop-shadow(0 0 4px var(--accent))}
+.gp{transition:stroke-dashoffset .25s ease-out;filter:drop-shadow(0 0 6px var(--accent))}
+.gv{font-family:var(--fh)}
+@media (max-width:440px){.gauges{grid-template-columns:1fr}.gwrap svg{max-width:260px}h1{font-size:1.2rem}}
+.net{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.gens{display:flex;gap:8px}
+.gens span{padding:8px 16px;border-radius:10px;border:1px solid var(--line);color:var(--muted);font:700 .95rem var(--fh);transition:.2s}
+.gens span.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#031018;border-color:transparent;box-shadow:0 0 22px var(--glow)}
+.net b{display:block;font-size:1.15rem}
+.foot{text-align:center;color:var(--muted);font:500 .75rem var(--fh);letter-spacing:.2em;text-transform:uppercase;margin-top:28px}
+.hide{display:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1>📺 Streaming Quality Checker</h1>
+  <p class="sub">Measures your real download, upload and latency, then recommends the best video quality. Works by simply opening this page.</p>
+
+  <section class="card hide" id="warn" style="border-color:var(--bad)">
+    <h2 style="color:var(--bad)">No test server reachable</h2>
+    <p id="warnTxt" style="margin:0 0 10px"></p>
+    <ol style="margin:0 0 14px;padding-left:20px;color:var(--muted)">
+      <li>Check that you’re online. A VPN, firewall or ad blocker can block <code>speed.cloudflare.com</code>. Then press <b>Check again</b>.</li>
+      <li>Or run your own test server: install Node.js 18+, run <code>node server.js</code> in the project folder, and open <b>http://localhost:3000</b>.</li>
+    </ol>
+    <button class="ghost" id="recheck">Check again</button>
+  </section>
+
+  <section class="card hero">
+    <div class="phase" id="phase">Ready</div>
+    <div class="gauges">
+      <div class="gwrap"><div class="glabel">Download</div><div id="gDl"></div></div>
+      <div class="gwrap"><div class="glabel">Upload</div><div id="gUl"></div></div>
+    </div>
+    <div class="bar"><i id="prog"></i></div>
+    <div class="status" id="status">Press start to run a full test (about 20 seconds).</div>
+    <div class="note" style="margin-top:4px">Test server: <b id="srcName">checking…</b></div>
+    <p style="margin:16px 0 0"><button id="go">Start test</button></p>
+  </section>
+
+  <section class="card">
+    <div class="net">
+      <div class="gens" id="gens"><span data-g="3G">3G</span><span data-g="4G">4G</span><span data-g="5G">5G</span></div>
+      <div style="flex:1;min-width:200px"><b id="netTitle">Detecting network…</b><div class="note" id="netSub" style="margin:2px 0 0"></div></div>
+    </div>
+  </section>
+
+  <section class="card stats">
+    <div class="stat"><b id="sPing">–</b><span>Latency (ms)</span></div>
+    <div class="stat"><b id="sJit">–</b><span>Jitter (ms)</span></div>
+    <div class="stat"><b id="sLoss">–</b><span>Packet loss</span></div>
+    <div class="stat"><b id="sStab">–</b><span>Stability</span></div>
+  </section>
+
+  <section class="card">
+    <div class="seg" role="tablist">
+      <button class="on" id="mWatch">Watching</button>
+      <button id="mLive">Going live</button>
+    </div>
+    <div id="recBox" class="hide">
+      <h2 id="recTitle">Recommended quality</h2>
+      <div class="rec"><div class="badge" id="recQ">–</div><p id="recTxt"></p></div>
+    </div>
+    <h2 style="margin-top:18px">Quality ladder</h2>
+    <div id="ladder"></div>
+    <p class="note" id="ladderNote"></p>
+  </section>
+
+  <section class="card">
+    <div class="flex" style="justify-content:space-between"><h2 style="margin:0">Recent tests</h2><button class="ghost" id="clr">Clear</button></div>
+    <div id="hist"><p class="note">No tests yet.</p></div>
+  </section>
+  <div class="foot">Project by Jerrson P. Torres</div>
+</main>
+
+<script>
+const q=s=>document.querySelector(s);
+const TIERS=[{n:'240p',h:240},{n:'360p',h:360},{n:'480p',h:480},{n:'720p HD',h:720},{n:'1080p Full HD',h:1080},{n:'1440p QHD',h:1440},{n:'4K Ultra HD',h:2160},{n:'8K Ultra HD',h:4320}];
+const BASE=[0.4,0.7,1.2,2.5,5,10,20,50];
+const LIVE=[0.5,0.9,1.5,3,6,10,20,60];
+const dpr=window.devicePixelRatio||1;
+const screenH=Math.round(Math.min(screen.width,screen.height)*dpr);
+let R={dl:null,ul:null,ping:null,jit:null,loss:null};
+let mode='watch',running=false,cur='dl';
+
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const median=a=>{const b=[...a].sort((x,y)=>x-y);return b[Math.floor(b.length/2)]};
+const fmt=n=>n>=100?Math.round(n):n>=10?n.toFixed(1):n.toFixed(2);
+function setPhase(p,msg,pct){q('#phase').textContent=p;if(msg)q('#status').textContent=msg;if(pct!=null)q('#prog').style.width=pct+'%'}
+function live(v){setGauge(cur,v)}
+
+const STOPS=[0,5,10,20,50,100,250,500,1000];
+const A0=-120,A1=120,GR=78,GL=GR*(A1-A0)*Math.PI/180;
+function frac(v){
+  v=Math.max(0,v);if(v>=1000)return 1;
+  for(let i=1;i<STOPS.length;i++)if(v<=STOPS[i]){const a=STOPS[i-1],b=STOPS[i];return(i-1+(v-a)/(b-a))/(STOPS.length-1)}
+  return 1;
+}
+function gaugeSVG(){
+  const P=(a,r)=>{const t=a*Math.PI/180;return[100+r*Math.sin(t),100-r*Math.cos(t)]};
+  const [sx,sy]=P(A0,GR),[ex,ey]=P(A1,GR);
+  const d='M'+sx.toFixed(2)+' '+sy.toFixed(2)+' A'+GR+' '+GR+' 0 1 1 '+ex.toFixed(2)+' '+ey.toFixed(2);
+  let ticks='';
+  STOPS.forEach((v,i)=>{
+    const a=A0+(A1-A0)*i/(STOPS.length-1),p1=P(a,GR-3),p2=P(a,GR+5),pl=P(a,GR-15);
+    ticks+='<line x1="'+p1[0].toFixed(1)+'" y1="'+p1[1].toFixed(1)+'" x2="'+p2[0].toFixed(1)+'" y2="'+p2[1].toFixed(1)+'" stroke="var(--muted)" stroke-width="1.5"/>'
+         +'<text x="'+pl[0].toFixed(1)+'" y="'+(pl[1]+2.5).toFixed(1)+'" text-anchor="middle" font-size="8" fill="var(--muted)">'+(v>=1000?'1k':v)+'</text>';
+  });
+  return '<svg viewBox="0 0 200 174" role="img" aria-label="Speed gauge in Mbps">'
+    +'<path d="'+d+'" fill="none" stroke-width="10" stroke-linecap="round"/>'
+    +'<path class="gp" d="'+d+'" fill="none" stroke="var(--accent)" stroke-width="10" stroke-linecap="round" stroke-dasharray="'+GL+'" stroke-dashoffset="'+GL+'"/>'
+    +ticks
+    +'<g class="needle"><line x1="100" y1="100" x2="100" y2="34" stroke="var(--text)" stroke-width="2.5" stroke-linecap="round"/></g>'
+    +'<circle cx="100" cy="100" r="6" fill="var(--accent)"/><circle cx="100" cy="100" r="2.5" fill="var(--bg)"/>'
+    +'<text class="gv" x="100" y="154" text-anchor="middle" font-size="22" font-weight="700" fill="var(--text)">–</text>'
+    +'<text x="100" y="168" text-anchor="middle" font-size="9" fill="var(--muted)">Mbps</text></svg>';
+}
+function setGauge(k,v){
+  const g=q(k==='dl'?'#gDl':'#gUl'),f=v==null?0:frac(v);
+  g.querySelector('.needle').style.transform='rotate('+(A0+(A1-A0)*f)+'deg)';
+  g.querySelector('.gp').style.strokeDashoffset=GL*(1-f);
+  g.querySelector('.gv').textContent=v==null?'–':fmt(v);
+}
+
+const conn=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+const genFromSpeed=d=>d>=150?'5G':d>=8?'4G':d>=1?'3G':'2G';
+const genFromBrowser=t=>t==='4g'?'4G':t==='3g'?'3G':(t==='2g'||t==='slow-2g')?'2G':null;
+function detectNet(){
+  const type=conn&&conn.type,cell=type==='cellular';
+  const link=cell?'Mobile data':type==='wifi'?'Wi-Fi':type==='ethernet'?'Wired':type==='none'?'Offline':'Connection type hidden by browser';
+  let gen=null,src='';
+  if(R.dl!=null){gen=genFromSpeed(R.dl);src='from your measured speed'}
+  else if(conn&&genFromBrowser(conn.effectiveType)){gen=genFromBrowser(conn.effectiveType);src='browser estimate, run the test to confirm'}
+  document.querySelectorAll('#gens span').forEach(el=>el.classList.toggle('on',el.dataset.g===gen));
+  q('#netTitle').textContent=gen?(cell?'Mobile network: '+gen:(gen==='2G'?'Very slow: 2G-class':gen+'-class connection')):'Run the test to detect your network';
+  const bits=[link];if(src)bits.push(src);
+  if(conn&&conn.effectiveType)bits.push('browser reports '+conn.effectiveType.toUpperCase()+(conn.downlink?' · ~'+conn.downlink+' Mbps':'')+(conn.rtt?' · '+conn.rtt+' ms RTT':''));
+  q('#netSub').textContent=bits.join(' · ');
+}
+
+const rnd=()=>Math.random().toString(36).slice(2);
+const LOCAL={name:'this server',ok:r=>r.status===204,
+  ping:()=>'/api/ping?r='+rnd(),down:n=>'/api/download?bytes='+n+'&r='+rnd(),up:()=>'/api/upload?r='+rnd()};
+const CFB='https://speed.cloudflare.com';
+const ONLINE={name:'Cloudflare',ok:r=>r.ok,
+  ping:()=>CFB+'/__down?bytes=0&r='+rnd(),down:n=>CFB+'/__down?bytes='+n+'&r='+rnd(),up:()=>CFB+'/__up?r='+rnd()};
+let EP=LOCAL;
+async function reach(ep){try{return ep.ok(await fetch(ep.ping(),{cache:'no-store'}))}catch(e){return false}}
+async function health(){
+  const w=q('#warn'),go=q('#go');
+  let ok=false;
+  if(location.protocol!=='file:'&&await reach(LOCAL)){EP=LOCAL;ok=true}
+  else if(await reach(ONLINE)){EP=ONLINE;ok=true}
+  w.classList.toggle('hide',ok);go.disabled=!ok;
+  q('#srcName').textContent=ok?(EP===LOCAL?'your own server (measures your link to it)':'Cloudflare public speed servers (measures your internet)'):'none reachable';
+  if(!ok)q('#warnTxt').textContent='Neither a local test server nor the online speed servers could be reached from this page.';
+  return ok;
+}
+
+async function testPing(n=15){
+  const t=[];let fail=0;
+  for(let i=0;i<n;i++){
+    const s=performance.now();
+    try{const r=await fetch(EP.ping(),{cache:'no-store'});if(!EP.ok(r))throw new Error('not the test server');if(i>0)t.push(performance.now()-s)}catch(e){fail++}
+    await sleep(60);
+  }
+  if(!t.length)throw new Error('Cannot reach the test server');
+  let j=0;for(let i=1;i<t.length;i++)j+=Math.abs(t[i]-t[i-1]);
+  return{ping:median(t),jit:t.length>1?j/(t.length-1):0,loss:fail/n*100};
+}
+
+function meter(ms,warm,p0,p1){
+  const t0=performance.now();let bytes=0,wB=0,wT=0,last=0;
+  const m={
+    get bytes(){return bytes},
+    speed(){const n=performance.now();return wT?(bytes-wB)*8/((n-wT)/1000)/1e6:bytes*8/(Math.max(n-t0,1)/1000)/1e6},
+    add(n){
+      bytes+=n;const now=performance.now();
+      if(!wT&&now-t0>=warm){wT=now;wB=bytes}
+      if(now-last>150){last=now;live(m.speed());q('#prog').style.width=(p0+Math.min(1,(now-t0)/ms)*(p1-p0))+'%'}
+    }};
+  return m;
+}
+
+async function testDownload(ms=8000,streams=4){
+  const t0=performance.now(),m=meter(ms,1200,33,66);
+  let err='',stopped=false;
+  async function worker(){
+    while(!stopped&&performance.now()-t0<ms&&!err){
+      try{
+        const r=await fetch(EP.down(25000000),{cache:'no-store'});
+        if(!r.ok){err='the server answered '+r.status+' to the download test';return}
+        if(!r.body){m.add((await r.arrayBuffer()).byteLength);continue}
+        const rd=r.body.getReader();
+        for(;;){
+          const {done,value}=await rd.read();if(done)break;
+          m.add(value.length);
+          if(stopped||performance.now()-t0>=ms){stopped=true;rd.cancel().catch(()=>{});return}
+        }
+      }catch(e){if(!stopped)err=e.message||'download request failed';return}
+    }
+  }
+  await Promise.all(Array.from({length:streams},worker));
+  if(m.bytes===0)throw new Error(err||'the download test received no data');
+  return m.speed();
+}
+
+function makeBlob(){
+  const c=new Uint8Array(65536);crypto.getRandomValues(c);
+  return new Blob(Array(16).fill(c));
+}
+async function testUpload(ms=6000,streams=3){
+  if(EP!==LOCAL)return testUploadFetch(ms,streams);
+  const blob=makeBlob(),t0=performance.now(),m=meter(ms,1000,66,100),xhrs=new Set();
+  let stop=false,err='';
+  function one(){
+    return new Promise(res=>{
+      const x=new XMLHttpRequest();xhrs.add(x);let prev=0;
+      x.open('POST','/api/upload?r='+Math.random());
+      x.upload.onprogress=e=>{m.add(e.loaded-prev);prev=e.loaded};
+      x.onerror=()=>{if(!stop)err='the upload request failed'};
+      x.onloadend=()=>{xhrs.delete(x);if(!stop&&x.status&&x.status!==200)err='the server answered '+x.status+' to the upload test';res()};
+      x.send(blob);
+    });
+  }
+  async function worker(){while(!stop&&!err&&performance.now()-t0<ms)await one()}
+  const timer=setTimeout(()=>{stop=true;xhrs.forEach(x=>x.abort())},ms);
+  await Promise.all(Array.from({length:streams},worker));
+  clearTimeout(timer);
+  if(m.bytes===0)throw new Error(err||'the upload test sent no data');
+  return m.speed();
+}
+
+async function testUploadFetch(ms=6000,streams=3){
+  const t0=performance.now(),m=meter(ms,1000,66,100);
+  let stop=false,err='',size=262144;
+  const mk=n=>{const c=new Uint8Array(65536);crypto.getRandomValues(c);return new Blob(Array(Math.ceil(n/65536)).fill(c))};
+  async function worker(){
+    while(!stop&&!err&&performance.now()-t0<ms){
+      const n=size,s=performance.now();
+      try{
+        const r=await fetch(EP.up(),{method:'POST',body:mk(n)});
+        await r.arrayBuffer().catch(()=>{});
+        if(!r.ok){err='the server answered '+r.status+' to the upload test';return}
+        m.add(n);
+        if(performance.now()-s<800&&size<16777216)size*=2;
+      }catch(e){err=e.message||'the upload request failed';return}
+    }
+  }
+  const timer=setTimeout(()=>{stop=true},ms);
+  const tick=setInterval(()=>{if(m.bytes)live(m.speed())},200);
+  await Promise.all(Array.from({length:streams},worker));
+  clearTimeout(timer);clearInterval(tick);
+  if(m.bytes===0)throw new Error(err||'the upload test sent no data');
+  return m.speed();
+}
+
+async function run(){
+  if(running)return;
+  if(!await health())return;
+  running=true;
+  const btn=q('#go');btn.disabled=true;btn.textContent='Testing…';
+  R={dl:null,ul:null,ping:null,jit:null,loss:null};setGauge('dl',null);setGauge('ul',null);render();
+  try{
+    setPhase('Latency','Checking latency and jitter…',3);
+    const p=await testPing();Object.assign(R,p);render();
+    setPhase('Download','Measuring download speed…',33);cur='dl';setGauge('dl',0);
+    R.dl=await testDownload();setGauge('dl',R.dl);render();
+    setPhase('Upload','Measuring upload speed…',66);cur='ul';setGauge('ul',0);
+    R.ul=await testUpload();setGauge('ul',R.ul);render();
+    setPhase('Done','Test complete.',100);
+    saveHist();
+  }catch(e){
+    setGauge('dl',R.dl);setGauge('ul',R.ul);setPhase('Error','Test failed: '+e.message+'.',0);
+  }
+  btn.disabled=false;btn.textContent='Test again';running=false;
+}
+
+function stability(){
+  if(R.ping==null)return{label:'–',f:1};
+  if(R.loss>=5||R.jit>=100)return{label:'Unstable',f:0.6};
+  if(R.loss>=2||R.jit>=40)return{label:'Fair',f:0.75};
+  if(R.jit>=15||R.ping>=150)return{label:'Good',f:0.9};
+  return{label:'Excellent',f:1};
+}
+function rates(){return mode==='live'?LIVE:BASE}
+function render(){
+  detectNet();
+  q('#sPing').textContent=R.ping==null?'–':Math.round(R.ping);
+  q('#sJit').textContent=R.jit==null?'–':R.jit.toFixed(1);
+  q('#sLoss').textContent=R.loss==null?'–':R.loss.toFixed(0)+'%';
+  const st=stability();q('#sStab').textContent=st.label;
+
+  const live=mode==='live',speed=live?R.ul:R.dl,m=rates();
+  const head=live?1.5:1.25;
+  q('#recTitle').textContent=live?'Best stream quality to broadcast':'Recommended quality';
+  const eff=speed==null?null:speed*st.f;
+  let best=-1;
+  if(eff!=null)TIERS.forEach((t,i)=>{if(m[i]*head<=eff&&t.h<=Math.max(screenH,480)+1)best=i});
+  if(eff!=null&&best<0&&m[0]<=eff)best=0;
+
+  q('#ladder').innerHTML=TIERS.map((t,i)=>{
+    let tag='<span class="tag" style="color:var(--muted)">–</span>',note='';
+    if(eff!=null){
+      const r=eff/m[i];
+      tag=r>=head?'<span class="tag good">Smooth</span>':r>=1?'<span class="tag warn">Borderline</span>':'<span class="tag bad">Will buffer</span>';
+      if(live&&r<head)tag=r>=1?'<span class="tag warn">Risky</span>':'<span class="tag bad">Too heavy</span>';
+      if(i===best)tag='<span class="tag good">★ Best pick</span>';
+      if(!live&&t.h>screenH+1&&i!==best)note=' · above your screen';
+    }
+    const gb=(m[i]*3600/8/1000).toFixed(1);
+    return '<div class="row"><div class="t">'+t.n.split(' ')[0]+'</div><div><div class="meter"><i style="width:'+Math.min(100,m[i]/50*100)+'%"></i></div><small>'+m[i]+' Mbps · ~'+gb+' GB/hr'+note+'</small></div>'+tag+'</div>';
+  }).join('');
+  q('#ladderNote').textContent=live?'Live uses your upload speed with 50% headroom, since a dropped upload means dropped frames.':'A tier is “Smooth” when your download speed is at least 25% above what it needs.';
+
+  const box=q('#recBox');
+  if(eff==null){box.classList.add('hide');return}
+  box.classList.remove('hide');
+  if(best<0){q('#recQ').textContent='240p or less';q('#recTxt').innerHTML='Your '+(live?'upload':'connection')+' is very slow right now. '+(live?'Try audio-only or a very low bitrate.':'Try 240p or download videos to watch offline.');return}
+  q('#recQ').textContent=TIERS[best].n.split(' ')[0];
+  const gb=(m[best]*3600/8/1000).toFixed(1);
+  let txt=live?'Your upload can sustain <strong>'+TIERS[best].n+'</strong> while streaming live, using about <strong>'+gb+' GB per hour</strong> of upload.'
+    :'Your connection can handle <strong>'+TIERS[best].n+'</strong> with room to spare, using roughly <strong>'+gb+' GB per hour</strong>.';
+  if(!live){const nx=best+1;if(nx<TIERS.length&&TIERS[nx].h>screenH+1&&m[nx]*head<=eff)txt+=' Higher tiers won’t look sharper on a '+screenH+'p screen.'}
+  if(st.f<1)txt+=' Your connection is a bit '+(st.label==='Unstable'?'unstable':'jittery')+', so a safer tier was chosen.';
+  q('#recTxt').innerHTML=txt;
+}
+
+function loadHist(){try{return JSON.parse(localStorage.getItem('sqc-hist')||'[]')}catch(e){return[]}}
+function saveHist(){
+  const h=loadHist();h.unshift({t:Date.now(),dl:R.dl,ul:R.ul,ping:R.ping});
+  try{localStorage.setItem('sqc-hist',JSON.stringify(h.slice(0,8)))}catch(e){}
+  drawHist();
+}
+function drawHist(){
+  const h=loadHist();
+  q('#hist').innerHTML=h.length?h.map(x=>'<div class="hist"><span>'+new Date(x.t).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</span><span>↓ '+fmt(x.dl)+' · ↑ '+fmt(x.ul)+' · '+Math.round(x.ping)+' ms</span></div>').join(''):'<p class="note">No tests yet.</p>';
+}
+
+q('#go').onclick=run;
+q('#recheck').onclick=health;
+function setMode(m){mode=m;q('#mWatch').classList.toggle('on',m==='watch');q('#mLive').classList.toggle('on',m==='live');render()}
+q('#mWatch').onclick=()=>setMode('watch');
+q('#mLive').onclick=()=>setMode('live');
+q('#clr').onclick=()=>{try{localStorage.removeItem('sqc-hist')}catch(e){}drawHist()};
+q('#gDl').innerHTML=gaugeSVG();q('#gUl').innerHTML=gaugeSVG();setGauge('dl',null);setGauge('ul',null);
+if(conn&&conn.addEventListener)conn.addEventListener('change',render);
+drawHist();render();health();
+</script>
+</body>
+</html>
